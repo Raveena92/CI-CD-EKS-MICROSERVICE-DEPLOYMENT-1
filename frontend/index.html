@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Scholarship App</title>
+</head>
+<body>
+  <h2>Scholarship Application</h2>
+
+  <form id="scholarshipForm">
+    <input type="text" id="name" placeholder="Enter name" required><br><br>
+    <input type="email" id="email" placeholder="Enter email" required><br><br>
+    <input type="date" id="dob" required><br><br>
+    <button type="submit">Apply</button>
+  </form>
+
+  <h3 id="result"></h3>
+
+  <script>
+    document.getElementById("scholarshipForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const response = await fetch("/api/apply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: document.getElementById("name").value,
+          email: document.getElementById("email").value,
+          dob: document.getElementById("dob").value
+        })
+      });
+
+      const data = await response.json();
+      document.getElementById("result").innerText = data.message;
+    });
+  </script>
+</body>
+</html>

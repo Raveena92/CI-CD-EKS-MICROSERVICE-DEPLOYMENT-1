@@ -1,0 +1,104 @@
+pipeline {
+    agent {
+        label 'docker'
+    }
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'qa'], description: 'Choose environment')
+    }
+
+    environment {
+        AWS_REGION  = 'ap-south-1'
+        ACCOUNT_ID  = '123456789012'
+        EKS_CLUSTER = 'obs-demo'
+
+        ECR_REGISTRY = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+
+        BACKEND_REPO = 'scholarship-backend'
+        FRONTEND_REPO = 'scholarship-frontend'
+
+        HELM_RELEASE = 'scholarship-app'
+        HELM_CHART = './helm/scholarship-app'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/your-user/scholarship-app.git'
+            }
+        }
+
+
+        stage('Login to ECR') {
+            steps {
+                sh '''
+                aws ecr get-login-password --region ${AWS_REGION} | \
+                docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                '''
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh '''
+                docker build -t ${ECR_REGISTRY}/${BACKEND_REPO}:${IMAGE_TAG} ./backend
+                docker build -t ${ECR_REGISTRY}/${FRONTEND_REPO}:${IMAGE_TAG} ./frontend
+                '''
+            }
+        }
+
+        stage('Push Docker Images') {
+            steps {
+                sh '''
+                docker push ${ECR_REGISTRY}/${BACKEND_REPO}:${IMAGE_TAG}
+                docker push ${ECR_REGISTRY}/${FRONTEND_REPO}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Update Kubeconfig') {
+            steps {
+                sh '''
+                aws eks update-kubeconfig \
+                  --region ${AWS_REGION} \
+                  --name ${EKS_CLUSTER}
+                '''
+            }
+        }
+
+        stage('Deploy with Helm') {
+            steps {
+                sh '''
+                NAMESPACE=scholarship-${ENVIRONMENT}
+
+                kubectl get ns ${NAMESPACE} >/dev/null 2>&1 || kubectl create ns ${NAMESPACE}
+
+                helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} \
+                  -n ${NAMESPACE} \
+                  -f ${HELM_CHART}/values-${ENVIRONMENT}.yaml \
+                  --set backend.image.repository=${ECR_REGISTRY}/${BACKEND_REPO} \
+                  --set backend.image.tag=${IMAGE_TAG} \
+                  --set frontend.image.repository=${ECR_REGISTRY}/${FRONTEND_REPO} \
+                  --set frontend.image.tag=${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                NAMESPACE=scholarship-${ENVIRONMENT}
+
+                kubectl get pods -n ${NAMESPACE}
+                kubectl get svc -n ${NAMESPACE}
+                kubectl get ingress -n ${NAMESPACE}
+
+                kubectl rollout status deployment/scholarship-backend -n ${NAMESPACE} --timeout=180s
+                kubectl rollout status deployment/scholarship-frontend -n ${NAMESPACE} --timeout=180s
+                '''
+            }
+        }
+    }
+}

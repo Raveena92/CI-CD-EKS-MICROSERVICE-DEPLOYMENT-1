@@ -1,0 +1,22 @@
+namespace: scholarship-qa
+
+environment: qa
+
+frontend:
+  image: ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/scholarship-frontend
+  tag: "latest"
+  replicas: 2
+
+backend:
+  image: ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/scholarship-backend
+  tag: "latest"
+  replicas: 2
+
+secretNameInAWS: qa/scholarship/rds
+
+serviceAccount:
+  name: scholarship-backend-sa
+  roleArn: arn:aws:iam::ACCOUNT_ID:role/scholarship-qa-secret-role
+
+ingress:
+  host: qa-scholarship.example.com
