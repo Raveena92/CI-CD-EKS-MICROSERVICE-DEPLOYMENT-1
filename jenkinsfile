@@ -9,7 +9,7 @@ pipeline {
 
     environment {
         AWS_REGION  = 'ap-south-1'
-        ACCOUNT_ID  = '123456789012'
+        ACCOUNT_ID  = '117822044662'
         EKS_CLUSTER = 'obs-demo'
 
         ECR_REGISTRY = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
